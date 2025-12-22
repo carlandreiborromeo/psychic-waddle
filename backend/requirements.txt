@@ -1,0 +1,10 @@
+fastapi==0.127.0
+uvicorn==0.24.0
+pyvisa==1.13.0
+pyvisa-py==0.7.0
+pydantic==2.5.0
+python-multipart==0.0.6
+aiofiles==23.2.1
+python-dateutil==2.8.2
+pydantic-settings==2.1.0
+numpy==1.26.2
