@@ -9,7 +9,6 @@ from app.models.calibration import (
     SignalType, PassFail
 )
 from app.utils.calculations import UncertaintyCalculator
-from app.utils.scpi_commands import SCPICommands
 
 class CalibrationService:
     def __init__(self, gpib_manager: GPIBManager):
@@ -67,39 +66,51 @@ class CalibrationService:
             
         finally:
             self.test_running = False
-            await self.gpib.send_command('calibrator', 'STBY')
+            await self.gpib.send_command('calibrator', 'standby')
     
     async def _initialize_instruments(self, config: TestConfig):
-        await self.gpib.send_command('calibrator', '*RST')
-        await self.gpib.send_command('dut', '*RST')
+        """Initialize using dynamic commands"""
+        await self.gpib.send_command('calibrator', 'reset')
+        await self.gpib.send_command('dut', 'reset')
         await asyncio.sleep(1)
         
+        # Configure DUT based on signal type
         if config.signal_type == SignalType.DC:
-            await self.gpib.send_command('dut', SCPICommands.DMM.CONF_VDC)
+            await self.gpib.send_command('dut', 'conf_dc_voltage')
         else:
-            await self.gpib.send_command('dut', SCPICommands.DMM.CONF_VAC)
+            await self.gpib.send_command('dut', 'conf_ac_voltage')
     
     async def _execute_test_point(self, voltage: float, config: TestConfig) -> TestPointResult:
-        if config.signal_type == SignalType.DC:
-            cmd = SCPICommands.Fluke5522A.set_dc_voltage(voltage)
-        else:
-            cmd = SCPICommands.Fluke5522A.set_ac_voltage(voltage, config.frequency)
+        """Execute test point using dynamic commands"""
         
-        await self.gpib.send_command('calibrator', cmd)
-        await self.gpib.send_command('calibrator', 'OPER')
+        # Set calibrator output
+        if config.signal_type == SignalType.DC:
+            await self.gpib.send_command('calibrator', 'set_dc_voltage', value=voltage)
+        else:
+            await self.gpib.send_command(
+                'calibrator', 
+                'set_ac_voltage', 
+                value=voltage, 
+                frequency=config.frequency
+            )
+        
+        await self.gpib.send_command('calibrator', 'operate')
         await asyncio.sleep(2)
         
+        # Take readings
         readings = []
         for _ in range(config.samples_per_point):
-            response = await self.gpib.send_command('dut', SCPICommands.DMM.READ, expect_response=True)
+            response = await self.gpib.send_command('dut', 'read', expect_response=True)
             readings.append(float(response))
             await asyncio.sleep(0.2)
         
+        # Calculate statistics
         mean = statistics.mean(readings)
         std_dev = statistics.stdev(readings) if len(readings) > 1 else 0.0
         error = mean - voltage
         error_pct = (error / voltage) * 100
         
+        # Calculate uncertainty
         type_a = UncertaintyCalculator.calculate_type_a(readings)
         type_b = UncertaintyCalculator.calculate_type_b(voltage, config.dut_accuracy)
         combined = UncertaintyCalculator.calculate_combined(type_a, type_b)

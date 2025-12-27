@@ -1,0 +1,84 @@
+{
+  "calibrators": {
+    "Fluke_5522A": {
+      "name": "Fluke 5522A",
+      "manufacturer": "Fluke",
+      "commands": {
+        "set_dc_voltage": "OUT {value}V",
+        "set_ac_voltage": "OUT {value}V, {frequency}HZ",
+        "set_dc_current": "OUT {value}A",
+        "set_ac_current": "OUT {value}A, {frequency}HZ",
+        "operate": "OPER",
+        "standby": "STBY",
+        "reset": "*RST"
+      }
+    },
+    "Fluke_5720A": {
+      "name": "Fluke 5720A",
+      "manufacturer": "Fluke",
+      "commands": {
+        "set_dc_voltage": "OUT {value}V,0HZ",
+        "set_ac_voltage": "OUT {value}V,{frequency}HZ",
+        "set_dc_current": "OUT {value}A,0HZ",
+        "set_ac_current": "OUT {value}A,{frequency}HZ",
+        "operate": "OPER",
+        "standby": "STBY",
+        "reset": "*RST"
+      }
+    },
+    "Transmille_3050": {
+      "name": "Transmille 3050",
+      "manufacturer": "Transmille",
+      "commands": {
+        "set_dc_voltage": "OUTP:VOLT {value}",
+        "set_ac_voltage": "OUTP:VOLT {value};:OUTP:FREQ {frequency}",
+        "set_dc_current": "OUTP:CURR {value}",
+        "set_ac_current": "OUTP:CURR {value};:OUTP:FREQ {frequency}",
+        "operate": "OUTP ON",
+        "standby": "OUTP OFF",
+        "reset": "*RST"
+      }
+    }
+  },
+  "dmms": {
+    "Keysight_34461A": {
+      "name": "Keysight 34461A",
+      "manufacturer": "Keysight",
+      "commands": {
+        "conf_dc_voltage": "CONF:VOLT:DC",
+        "conf_ac_voltage": "CONF:VOLT:AC",
+        "conf_dc_current": "CONF:CURR:DC",
+        "conf_ac_current": "CONF:CURR:AC",
+        "read": "READ?",
+        "reset": "*RST"
+      }
+    },
+    "Fluke_8846A": {
+      "name": "Fluke 8846A",
+      "manufacturer": "Fluke",
+      "commands": {
+        "conf_dc_voltage": "CONF:VOLT:DC",
+        "conf_ac_voltage": "CONF:VOLT:AC",
+        "conf_dc_current": "CONF:CURR:DC",
+        "conf_ac_current": "CONF:CURR:AC",
+        "read": "READ?",
+        "reset": "*RST"
+      }
+    }
+  },
+  "psus": {
+    "Keysight_E36312A": {
+      "name": "Keysight E36312A",
+      "manufacturer": "Keysight",
+      "commands": {
+        "set_voltage": "VOLT {value}",
+        "set_current": "CURR {value}",
+        "output_on": "OUTP ON",
+        "output_off": "OUTP OFF",
+        "measure_voltage": "MEAS:VOLT?",
+        "measure_current": "MEAS:CURR?",
+        "reset": "*RST"
+      }
+    }
+  }
+}

@@ -4,6 +4,7 @@ from app.config import settings
 from app.services.gpib_manager import GPIBManager
 from app.services.calibration_service import CalibrationService
 from app.services.file_storage import FileStorage
+from app.services.instrument_library import InstrumentLibrary
 from app.models.instrument import ConnectionRequest, ConnectionResponse
 from app.models.calibration import TestConfig, CalibrationReport
 
@@ -19,16 +20,45 @@ app.add_middleware(
 
 gpib_manager = GPIBManager()
 calibration_service = CalibrationService(gpib_manager)
+instrument_library = InstrumentLibrary()
 
 @app.get("/")
 async def root():
     return {"application": settings.APP_NAME, "version": settings.VERSION}
 
+@app.get("/api/instruments/available")
+async def list_available_instruments():
+    """NEW: List all supported instruments from JSON config"""
+    try:
+        return {
+            "calibrators": instrument_library.list_instruments("calibrators"),
+            "dmms": instrument_library.list_instruments("dmms"),
+            "psus": instrument_library.list_instruments("psus")
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.post("/api/instruments/connect", response_model=ConnectionResponse)
 async def connect_instruments(request: ConnectionRequest):
+    """UPDATED: Connect with user-selected instrument models"""
     try:
-        cal_info = await gpib_manager.connect_instrument(request.calibrator_address, 'calibrator')
-        dut_info = await gpib_manager.connect_instrument(request.dut_address, 'dut')
+        # Determine DUT instrument type (dmms or psus)
+        dut_instrument_type = request.dut_type + "s"  # "dmm" → "dmms", "psu" → "psus"
+        
+        cal_info = await gpib_manager.connect_instrument(
+            request.calibrator_address,
+            "calibrators",
+            request.calibrator_model,
+            "calibrator"
+        )
+        
+        dut_info = await gpib_manager.connect_instrument(
+            request.dut_address,
+            dut_instrument_type,
+            request.dut_model,
+            "dut"
+        )
+        
         return ConnectionResponse(
             success=True,
             calibrator=cal_info,

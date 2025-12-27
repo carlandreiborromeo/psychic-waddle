@@ -36,6 +36,13 @@ const WebApp = () => {
   const [savedReports, setSavedReports] = useState([]);
   const [currentReport, setCurrentReport] = useState(null);
   
+  // NEW: Available instruments from backend
+  const [availableInstruments, setAvailableInstruments] = useState({
+    calibrators: [],
+    dmms: [],
+    psus: []
+  });
+  
   const [testConfig, setTestConfig] = useState({
     signal_type: 'DC',
     test_points: '1, 5, 10',
@@ -46,10 +53,18 @@ const WebApp = () => {
     dut_accuracy: 0.0001
   });
 
-  const [calAddress, setCalAddress] = useState('GPIB0::1::INSTR');
-  const [dutAddress, setDutAddress] = useState('GPIB0::22::INSTR');
+  // NEW: Connection config with instrument models
+  const [connectionConfig, setConnectionConfig] = useState({
+    calibrator_address: 'GPIB0::1::INSTR',
+    calibrator_model: 'Fluke_5522A',
+    dut_address: 'GPIB0::22::INSTR',
+    dut_model: 'Keysight_34461A',
+    dut_type: 'dmm'
+  });
 
+  // Load available instruments on mount
   useEffect(() => {
+    loadAvailableInstruments();
     loadSavedReports();
   }, []);
 
@@ -64,6 +79,15 @@ const WebApp = () => {
     }
   }, [calibrator.connected, dut.connected]);
 
+  const loadAvailableInstruments = async () => {
+    try {
+      const data = await api.get('/api/instruments/available');
+      setAvailableInstruments(data);
+    } catch (error) {
+      console.error('Failed to load available instruments:', error);
+    }
+  };
+
   const loadSavedReports = async () => {
     try {
       const data = await api.get('/api/results/reports?limit=100');
@@ -76,10 +100,7 @@ const WebApp = () => {
   const handleConnect = async () => {
     setConnecting(true);
     try {
-      const result = await api.post('/api/instruments/connect', {
-        calibrator_address: calAddress,
-        dut_address: dutAddress
-      });
+      const result = await api.post('/api/instruments/connect', connectionConfig);
       setCalibrator(result.calibrator);
       setDut(result.dut);
     } catch (error) {
@@ -171,7 +192,7 @@ const WebApp = () => {
             <Zap className="w-8 h-8" />
             <div>
               <h1 className="text-2xl font-bold">GPIB Calibration System</h1>
-              <p className="text-blue-100 text-sm">ISO/IEC 17025 Compliant</p>
+              <p className="text-blue-100 text-sm">ISO/IEC 17025 Compliant • Multi-Instrument Support</p>
             </div>
           </div>
           <div className="text-right text-sm">
@@ -219,7 +240,12 @@ const WebApp = () => {
                       <span className="font-medium text-gray-700">{inst.label}</span>
                       {inst.data.connected ? <CheckCircle className="w-4 h-4 text-green-500" /> : <XCircle className="w-4 h-4 text-red-500" />}
                     </div>
-                    {inst.data.connected && <div className="text-xs text-gray-500">{inst.data.model}</div>}
+                    {inst.data.connected && (
+                      <div className="text-xs text-gray-600">
+                        <div>{inst.data.model}</div>
+                        <div className="text-gray-500">{inst.data.serial_number}</div>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -231,28 +257,246 @@ const WebApp = () => {
             {activeTab === 'home' && (
               <div className="space-y-6">
                 <div className="bg-white rounded-lg shadow-md p-6">
-                  <h2 className="text-xl font-semibold mb-4">Connection</h2>
-                  <div className="grid grid-cols-2 gap-4 mb-4">
-                    <input value={calAddress} onChange={e => setCalAddress(e.target.value)} className="p-2 border rounded" placeholder="Calibrator Address" />
-                    <input value={dutAddress} onChange={e => setDutAddress(e.target.value)} className="p-2 border rounded" placeholder="DUT Address" />
+                  <h2 className="text-xl font-semibold mb-4">Instrument Connection</h2>
+                  
+                  {/* Calibrator Section */}
+                  <div className="mb-6">
+                    <h3 className="font-medium text-gray-700 mb-3">Calibrator</h3>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm text-gray-600 mb-1">Model</label>
+                        <select 
+                          value={connectionConfig.calibrator_model}
+                          onChange={e => setConnectionConfig({...connectionConfig, calibrator_model: e.target.value})}
+                          className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                          disabled={calibrator.connected}
+                        >
+                          {availableInstruments.calibrators.map(cal => (
+                            <option key={cal} value={cal}>{cal.replace(/_/g, ' ')}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm text-gray-600 mb-1">GPIB Address</label>
+                        <input 
+                          value={connectionConfig.calibrator_address}
+                          onChange={e => setConnectionConfig({...connectionConfig, calibrator_address: e.target.value})}
+                          className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                          placeholder="GPIB0::1::INSTR"
+                          disabled={calibrator.connected}
+                        />
+                      </div>
+                    </div>
                   </div>
+
+                  {/* DUT Section */}
+                  <div className="mb-6">
+                    <h3 className="font-medium text-gray-700 mb-3">Device Under Test (DUT)</h3>
+                    <div className="grid grid-cols-3 gap-4">
+                      <div>
+                        <label className="block text-sm text-gray-600 mb-1">Type</label>
+                        <select 
+                          value={connectionConfig.dut_type}
+                          onChange={e => setConnectionConfig({...connectionConfig, dut_type: e.target.value})}
+                          className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                          disabled={dut.connected}
+                        >
+                          <option value="dmm">DMM (Multimeter)</option>
+                          <option value="psu">PSU (Power Supply)</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm text-gray-600 mb-1">Model</label>
+                        <select 
+                          value={connectionConfig.dut_model}
+                          onChange={e => setConnectionConfig({...connectionConfig, dut_model: e.target.value})}
+                          className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                          disabled={dut.connected}
+                        >
+                          {(connectionConfig.dut_type === 'dmm' ? availableInstruments.dmms : availableInstruments.psus).map(model => (
+                            <option key={model} value={model}>{model.replace(/_/g, ' ')}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm text-gray-600 mb-1">GPIB Address</label>
+                        <input 
+                          value={connectionConfig.dut_address}
+                          onChange={e => setConnectionConfig({...connectionConfig, dut_address: e.target.value})}
+                          className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                          placeholder="GPIB0::22::INSTR"
+                          disabled={dut.connected}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  
                   <div className="flex space-x-2">
-                    <button onClick={handleConnect} disabled={connecting} className="px-4 py-2 bg-blue-600 text-white rounded">Connect</button>
-                    <button onClick={handleDisconnect} className="px-4 py-2 bg-red-100 text-red-600 rounded">Disconnect</button>
+                    <button 
+                      onClick={handleConnect} 
+                      disabled={connecting || (calibrator.connected && dut.connected)} 
+                      className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+                    >
+                      {connecting ? 'Connecting...' : 'Connect'}
+                    </button>
+                    <button 
+                      onClick={handleDisconnect} 
+                      disabled={!calibrator.connected && !dut.connected}
+                      className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+                    >
+                      Disconnect
+                    </button>
                   </div>
                 </div>
 
                 {/* Command Monitor */}
                 <div className="bg-white rounded-lg shadow-md p-6">
                   <h2 className="text-xl font-semibold mb-4 text-gray-800">Command Monitor</h2>
-                  <div className="bg-gray-900 rounded-lg p-4 h-64 overflow-y-auto font-mono text-xs text-white">
-                    {commandLog.length === 0 ? "Listening for GPIB traffic..." : commandLog.map((log, i) => (
-                      <div key={i} className="mb-1">
-                        <span className="text-gray-500">[{log.timestamp}]</span> {log.command}
-                      </div>
-                    ))}
+                  <div className="bg-gray-900 rounded-lg p-4 h-64 overflow-y-auto font-mono text-xs">
+                    {commandLog.length === 0 ? (
+                      <div className="text-gray-500 text-center py-8">Waiting for GPIB commands...</div>
+                    ) : (
+                      commandLog.slice().reverse().map((log, i) => (
+                        <div key={i} className="mb-2">
+                          <span className="text-gray-500">[{new Date(log.timestamp).toLocaleTimeString()}]</span>{' '}
+                          <span className={log.instrument === 'calibrator' ? 'text-yellow-400' : 'text-cyan-400'}>
+                            {log.instrument.toUpperCase()}
+                          </span>{' '}
+                          <span className="text-white">→ {log.command}</span>
+                          {log.response && <span className="text-green-400"> → {log.response}</span>}
+                          <span className={log.status === 'success' ? 'text-green-400' : 'text-red-400'}>
+                            {' '}✓ ({log.duration_ms}ms)
+                          </span>
+                        </div>
+                      ))
+                    )}
                   </div>
                 </div>
+              </div>
+            )}
+
+            {activeTab === 'calibration' && (
+              <div className="bg-white rounded-lg shadow-md p-6">
+                <h2 className="text-xl font-semibold mb-4">Calibration Test Configuration</h2>
+                <div className="grid grid-cols-2 gap-4 mb-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Signal Type</label>
+                    <select
+                      value={testConfig.signal_type}
+                      onChange={e => setTestConfig({...testConfig, signal_type: e.target.value})}
+                      className="w-full p-2 border rounded-lg"
+                      disabled={testRunning}
+                    >
+                      <option value="DC">DC Voltage</option>
+                      <option value="AC">AC Voltage</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Test Points (comma-separated)</label>
+                    <input
+                      value={testConfig.test_points}
+                      onChange={e => setTestConfig({...testConfig, test_points: e.target.value})}
+                      className="w-full p-2 border rounded-lg"
+                      placeholder="1, 5, 10"
+                      disabled={testRunning}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Samples per Point</label>
+                    <input
+                      type="number"
+                      value={testConfig.samples_per_point}
+                      onChange={e => setTestConfig({...testConfig, samples_per_point: e.target.value})}
+                      className="w-full p-2 border rounded-lg"
+                      disabled={testRunning}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Tolerance (%)</label>
+                    <input
+                      type="number"
+                      step="0.001"
+                      value={testConfig.tolerance_percent}
+                      onChange={e => setTestConfig({...testConfig, tolerance_percent: e.target.value})}
+                      className="w-full p-2 border rounded-lg"
+                      disabled={testRunning}
+                    />
+                  </div>
+                  {testConfig.signal_type === 'AC' && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Frequency (Hz)</label>
+                      <input
+                        type="number"
+                        value={testConfig.frequency}
+                        onChange={e => setTestConfig({...testConfig, frequency: e.target.value})}
+                        className="w-full p-2 border rounded-lg"
+                        disabled={testRunning}
+                      />
+                    </div>
+                  )}
+                </div>
+                <button
+                  onClick={handleStartTest}
+                  disabled={testRunning || !calibrator.connected || !dut.connected}
+                  className="flex items-center space-x-2 px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-300"
+                >
+                  <Play className="w-5 h-5" />
+                  <span>{testRunning ? 'Test Running...' : 'Start Test'}</span>
+                </button>
+              </div>
+            )}
+
+            {activeTab === 'results' && (
+              <div className="bg-white rounded-lg shadow-md p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-xl font-semibold text-gray-800">Test Results</h2>
+                  {currentReport && (
+                    <button onClick={handleExportData} className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg">
+                      <Download className="w-4 h-4" />
+                      <span>Export JSON</span>
+                    </button>
+                  )}
+                </div>
+                
+                {testResults.length === 0 ? (
+                  <div className="text-center py-12 text-gray-500">
+                    <Database className="w-12 h-12 mx-auto mb-3 text-gray-400" />
+                    <p>No test results. Run a calibration to see results.</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-gray-50 border-b-2">
+                        <tr>
+                          <th className="px-4 py-3 text-left font-semibold">Point</th>
+                          <th className="px-4 py-3 text-right font-semibold">Nominal</th>
+                          <th className="px-4 py-3 text-right font-semibold">Mean</th>
+                          <th className="px-4 py-3 text-right font-semibold">Error %</th>
+                          <th className="px-4 py-3 text-right font-semibold">U (k=2)</th>
+                          <th className="px-4 py-3 text-center font-semibold">Result</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {testResults.map((result, idx) => (
+                          <tr key={idx} className="border-b hover:bg-gray-50">
+                            <td className="px-4 py-3">{idx + 1}</td>
+                            <td className="px-4 py-3 text-right font-mono">{result.calibrator_output.toFixed(6)} V</td>
+                            <td className="px-4 py-3 text-right font-mono">{result.mean_reading.toFixed(6)} V</td>
+                            <td className="px-4 py-3 text-right font-mono">{result.error_percentage.toFixed(4)}%</td>
+                            <td className="px-4 py-3 text-right font-mono">{result.expanded_uncertainty.toFixed(6)} V</td>
+                            <td className="px-4 py-3 text-center">
+                              <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                                result.pass_fail === 'PASS' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                              }`}>
+                                {result.pass_fail}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
             )}
 
@@ -285,8 +529,6 @@ const WebApp = () => {
                 </div>
               </div>
             )}
-            
-            {/* Add other tab contents (calibration, results) as needed */}
           </div>
         </div>
       </div>
