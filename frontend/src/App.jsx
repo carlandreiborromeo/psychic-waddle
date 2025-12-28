@@ -236,17 +236,43 @@ const App = () => {
           {/* Main Content */}
           <div className="col-span-9">
             {activeTab === 'home' && (
-              <ConnectionPanel
-                connectionConfig={connectionConfig}
-                setConnectionConfig={setConnectionConfig}
-                availableInstruments={availableInstruments}
-                calibrator={calibrator}
-                dut={dut}
-                connecting={connecting}
-                onConnect={handleConnect}
-                onDisconnect={handleDisconnect}
-              />
-            )}
+  <div className="space-y-6">
+    <ConnectionPanel
+      connectionConfig={connectionConfig}
+      setConnectionConfig={setConnectionConfig}
+      availableInstruments={availableInstruments}
+      calibrator={calibrator}
+      dut={dut}
+      connecting={connecting}
+      onConnect={handleConnect}
+      onDisconnect={handleDisconnect}
+    />
+
+    {/* Command Monitor */}
+    <div className="bg-white rounded-lg shadow-md p-6">
+      <h2 className="text-xl font-semibold mb-4 text-gray-800">Command Monitor</h2>
+      <div className="bg-gray-900 rounded-lg p-4 h-64 overflow-y-auto font-mono text-xs">
+        {commandLog.length === 0 ? (
+          <div className="text-gray-500 text-center py-8">Waiting for GPIB commands...</div>
+        ) : (
+          commandLog.slice().reverse().map((log, i) => (
+            <div key={i} className="mb-2">
+              <span className="text-gray-500">[{new Date(log.timestamp).toLocaleTimeString()}]</span>{' '}
+              <span className={log.instrument === 'calibrator' ? 'text-yellow-400' : 'text-cyan-400'}>
+                {log.instrument.toUpperCase()}
+              </span>{' '}
+              <span className="text-white">→ {log.command}</span>
+              {log.response && <span className="text-green-400"> → {log.response}</span>}
+              <span className={log.status === 'success' ? 'text-green-400' : 'text-red-400'}>
+                {' '}✓ ({log.duration_ms}ms)
+              </span>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  </div>
+)}
 
             {activeTab === 'calibration' && (
               <div className="space-y-6">
