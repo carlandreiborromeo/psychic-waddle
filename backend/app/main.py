@@ -1,3 +1,5 @@
+# ===== app/main.py (UPDATED WITH MANUAL MODE) =====
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
@@ -6,7 +8,10 @@ from app.services.calibration_service import CalibrationService
 from app.services.file_storage import FileStorage
 from app.services.instrument_library import InstrumentLibrary
 from app.models.instrument import ConnectionRequest, ConnectionResponse
-from app.models.calibration import TestConfig, CalibrationReport
+from app.models.calibration import (
+    TestConfig, CalibrationReport, TestPointResult,
+    ManualCommandRequest, ManualCommandResponse
+)
 
 app = FastAPI(title=settings.APP_NAME, version=settings.VERSION)
 
@@ -28,7 +33,7 @@ async def root():
 
 @app.get("/api/instruments/available")
 async def list_available_instruments():
-    """NEW: List all supported instruments from JSON config"""
+    """List all supported instruments from JSON config"""
     try:
         return {
             "calibrators": instrument_library.list_instruments("calibrators"),
@@ -40,10 +45,9 @@ async def list_available_instruments():
 
 @app.post("/api/instruments/connect", response_model=ConnectionResponse)
 async def connect_instruments(request: ConnectionRequest):
-    """UPDATED: Connect with user-selected instrument models"""
+    """Connect with user-selected instrument models"""
     try:
-        # Determine DUT instrument type (dmms or psus)
-        dut_instrument_type = request.dut_type + "s"  # "dmm" → "dmms", "psu" → "psus"
+        dut_instrument_type = request.dut_type + "s"
         
         cal_info = await gpib_manager.connect_instrument(
             request.calibrator_address,
@@ -84,8 +88,79 @@ async def list_resources():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+# NEW: Manual command endpoint
+@app.post("/api/manual/command", response_model=ManualCommandResponse)
+async def send_manual_command(request: ManualCommandRequest):
+    """
+    Send a single command to calibrator or DUT
+    Used for manual mode
+    
+    Example:
+    {
+      "instrument": "calibrator",
+      "command_name": "set_dc_voltage",
+      "parameters": {"value": 10.0},
+      "expect_response": false
+    }
+    """
+    try:
+        from datetime import datetime
+        start_time = datetime.now()
+        
+        # Send command
+        response = await gpib_manager.send_command(
+            request.instrument,
+            request.command_name,
+            expect_response=request.expect_response,
+            **request.parameters
+        )
+        
+        duration = int((datetime.now() - start_time).total_seconds() * 1000)
+        
+        # Get the actual SCPI command that was sent
+        if request.instrument == 'calibrator':
+            instrument_type = "calibrators"
+            model = gpib_manager.calibrator_model
+        else:
+            instrument_type = gpib_manager.dut_type
+            model = gpib_manager.dut_model
+        
+        scpi_command = instrument_library.get_command(
+            instrument_type,
+            model,
+            request.command_name,
+            **request.parameters
+        )
+        
+        return ManualCommandResponse(
+            success=True,
+            command_sent=scpi_command,
+            response=response,
+            duration_ms=duration,
+            message=f"Command sent to {request.instrument}"
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# NEW: Single point test endpoint
+@app.post("/api/calibration/single-point", response_model=TestPointResult)
+async def run_single_point(value: float, config: TestConfig, operator: str = "Admin"):
+    """
+    Run calibration for ONE test point only
+    Used for manual step-by-step testing
+    """
+    try:
+        result = await calibration_service.run_single_point_test(value, config, operator)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.post("/api/calibration/semi-auto/start", response_model=CalibrationReport)
 async def start_semi_auto_test(config: TestConfig, operator: str = "Admin"):
+    """
+    Run COMPLETE semi-automatic test
+    Tests each point ONE AT A TIME automatically
+    """
     try:
         report = await calibration_service.run_semi_auto_test(config, operator)
         return report
