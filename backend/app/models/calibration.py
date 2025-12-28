@@ -1,19 +1,26 @@
+# ===== app/models/calibration.py (UPDATED) =====
+
 from pydantic import BaseModel, Field, validator
 from typing import List, Optional
-from datetime import datetime
 from enum import Enum
 
 class SignalType(str, Enum):
-    DC = "DC"
-    AC = "AC"
+    DC_VOLTAGE = "DC_VOLTAGE"
+    AC_VOLTAGE = "AC_VOLTAGE"
+    DC_CURRENT = "DC_CURRENT"  # NEW
+    AC_CURRENT = "AC_CURRENT"  # NEW
 
 class PassFail(str, Enum):
     PASS = "PASS"
     FAIL = "FAIL"
 
+class TestMode(str, Enum):
+    MANUAL = "manual"
+    SEMI_AUTO = "semi_auto"
+
 class TestConfig(BaseModel):
-    signal_type: SignalType = SignalType.DC
-    test_points: List[float]
+    signal_type: SignalType = SignalType.DC_VOLTAGE
+    test_points: List[float]  # Each point is separate
     frequency: Optional[float] = None
     samples_per_point: int = 10
     tolerance_percent: float = 0.01
@@ -79,3 +86,17 @@ class CommandLogEntry(BaseModel):
     response: Optional[str] = None
     duration_ms: int
     status: str
+
+# NEW: Manual command models
+class ManualCommandRequest(BaseModel):
+    instrument: str = Field(..., description="calibrator or dut")
+    command_name: str = Field(..., description="Command name from instruments.json")
+    parameters: dict = Field(default={}, description="Command parameters like value, frequency")
+    expect_response: bool = Field(default=False, description="Wait for response?")
+
+class ManualCommandResponse(BaseModel):
+    success: bool
+    command_sent: str
+    response: Optional[str] = None
+    duration_ms: int
+    message: str

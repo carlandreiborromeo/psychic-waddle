@@ -4,7 +4,7 @@
       "name": "Fluke 5522A",
       "manufacturer": "Fluke",
       "commands": {
-        "set_dc_voltage": "OUT {value}V",
+        "set_dc_voltage": "OUT {value}V", 
         "set_ac_voltage": "OUT {value}V, {frequency}HZ",
         "set_dc_current": "OUT {value}A",
         "set_ac_current": "OUT {value}A, {frequency}HZ",
